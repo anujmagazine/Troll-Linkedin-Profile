@@ -33,12 +33,17 @@ export default function App() {
     if (!image) return;
     setIsAnalyzing(true);
     setError(null);
+    console.log("Starting analysis...");
     try {
       const result = await analyzeLinkedInProfile(image);
+      console.log("Analysis complete, result:", result);
+      if (result.length === 0) {
+        setError("Gemini didn't find anything to roast. Is this profile actually... good? (Impossible)");
+      }
       setAnnotations(result);
-    } catch (err) {
-      setError("Gemini failed to roast this profile. Maybe it's too perfect? (Unlikely)");
-      console.error(err);
+    } catch (err: any) {
+      console.error("Analysis failed:", err);
+      setError(err.message || "Gemini failed to roast this profile. Check your internet or API key.");
     } finally {
       setIsAnalyzing(false);
     }
