@@ -53,13 +53,9 @@ async function resizeImage(base64Str: string, maxDim: number = 1024): Promise<st
 }
 
 export async function analyzeLinkedInProfile(base64Image: string): Promise<Annotation[]> {
-  // In Vite, process.env.GEMINI_API_KEY is replaced by the define plugin
-  const apiKey = process.env.GEMINI_API_KEY;
+  // Use the API key automatically provided by the AI Studio environment
+  const apiKey = process.env.GEMINI_API_KEY || "";
   
-  if (!apiKey || apiKey === "MY_GEMINI_API_KEY") {
-    throw new Error("Gemini API key is not configured. Please add GEMINI_API_KEY to your secrets.");
-  }
-
   const ai = new GoogleGenAI({ apiKey });
   const model = "gemini-3-flash-preview";
   
