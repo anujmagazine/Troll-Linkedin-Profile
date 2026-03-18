@@ -15,8 +15,11 @@ export interface Annotation {
  */
 async function resizeImage(base64Str: string, maxDim: number = 1024): Promise<string> {
   return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => reject(new Error("Image resize timed out")), 10000);
     const img = new Image();
+    
     img.onload = () => {
+      clearTimeout(timeout);
       try {
         const canvas = document.createElement('canvas');
         let width = img.width;
@@ -47,7 +50,13 @@ async function resizeImage(base64Str: string, maxDim: number = 1024): Promise<st
         reject(err);
       }
     };
-    img.onerror = () => reject(new Error("Failed to load image for resizing"));
+    
+    img.onerror = (e) => {
+      clearTimeout(timeout);
+      console.error("Image load error:", e);
+      reject(new Error("Failed to load image for resizing. The image might be corrupted or too large."));
+    };
+    
     img.src = base64Str;
   });
 }
@@ -57,12 +66,20 @@ export async function analyzeLinkedInProfile(base64Image: string): Promise<Annot
   const apiKey = process.env.GEMINI_API_KEY || "";
   
   const ai = new GoogleGenAI({ apiKey });
-  const model = "gemini-3-flash-preview";
+  // Using gemini-2.5-flash for speed and reliability in vision tasks
+  const model = "gemini-2.5-flash";
   
   console.log("Resizing image...");
-  const resizedImage = await resizeImage(base64Image);
+  let resizedImage;
+  try {
+    resizedImage = await resizeImage(base64Image);
+  } catch (e: any) {
+    console.error("Resize failed:", e);
+    throw new Error(`Failed to process image: ${e.message}`);
+  }
+  
   const base64Data = resizedImage.split(',')[1];
-  console.log("Image resized, calling Gemini...");
+  console.log("Image resized, calling Gemini with model:", model);
 
   const prompt = `
     You are a professional LinkedIn troller. Your job is to find the most cringe, braggy, or "thought leader" parts of a LinkedIn profile and mock them with red ink annotations.
@@ -119,13 +136,18 @@ export async function analyzeLinkedInProfile(base64Image: string): Promise<Annot
     });
 
     if (!response.text) {
-      console.warn("Gemini returned an empty response.");
+      console.warn("Gemini returned an empty response text.");
       return [];
     }
 
-    return JSON.parse(response.text);
-  } catch (e) {
-    console.error("Error analyzing LinkedIn profile:", e);
-    throw e; // Re-throw to be caught by the UI
+    console.log("Gemini raw response:", response.text);
+    const parsed = JSON.parse(response.text);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (e: any) {
+    console.error("Error in analyzeLinkedInProfile:", e);
+    if (e.message?.includes("API key")) {
+      throw new Error("Invalid API key. Please check your Gemini API key configuration.");
+    }
+    throw new Error(`Gemini analysis failed: ${e.message || "Unknown error"}`);
   }
 }

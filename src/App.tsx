@@ -51,48 +51,71 @@ export default function App() {
 
   const drawCanvas = () => {
     const canvas = canvasRef.current;
-    if (!canvas || !image) return;
+    if (!canvas || !image) {
+      console.warn("Canvas or image not ready for drawing", { canvas: !!canvas, image: !!image });
+      return;
+    }
 
     const ctx = canvas.getContext('2d');
-    if (!ctx) return;
+    if (!ctx) {
+      console.error("Failed to get canvas context");
+      return;
+    }
 
+    console.log("Drawing canvas with annotations:", annotations.length);
     const img = new Image();
+    img.crossOrigin = "anonymous";
     img.src = image;
+    
     img.onload = () => {
+      console.log("Image loaded for canvas, dimensions:", img.width, "x", img.height);
       canvas.width = img.width;
       canvas.height = img.height;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.drawImage(img, 0, 0);
 
       // Draw annotations
-      annotations.forEach(ann => {
+      annotations.forEach((ann, index) => {
         ctx.strokeStyle = '#ef4444'; // red-500
         ctx.fillStyle = '#ef4444';
-        ctx.lineWidth = Math.max(img.width / 200, 3);
+        ctx.lineWidth = Math.max(img.width / 150, 4);
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
 
         const x = (ann.x / 100) * img.width;
         const y = (ann.y / 100) * img.height;
 
+        console.log(`Drawing annotation ${index}:`, ann.type, "at", x, y);
+
         if (ann.type === 'circle') {
           ctx.beginPath();
-          ctx.ellipse(x, y, img.width * 0.05, img.height * 0.03, (ann.rotation || 0) * Math.PI / 180, 0, 2 * Math.PI);
+          const radiusX = img.width * 0.06;
+          const radiusY = img.height * 0.04;
+          ctx.ellipse(x, y, radiusX, radiusY, (ann.rotation || 0) * Math.PI / 180, 0, 2 * Math.PI);
           ctx.stroke();
         } else if (ann.type === 'arrow' && ann.targetX !== undefined && ann.targetY !== undefined) {
           const tx = (ann.targetX / 100) * img.width;
           const ty = (ann.targetY / 100) * img.height;
-          drawArrow(ctx, x, y, tx, ty, Math.max(img.width / 100, 10));
+          drawArrow(ctx, x, y, tx, ty, Math.max(img.width / 80, 15));
         } else if (ann.type === 'text' && ann.content) {
-          ctx.font = `bold ${Math.max(img.width / 30, 24)}px "Caveat"`;
+          const fontSize = Math.max(img.width / 25, 28);
+          ctx.font = `bold ${fontSize}px "Caveat"`;
           ctx.save();
           ctx.translate(x, y);
           ctx.rotate((ann.rotation || -5) * Math.PI / 180);
+          ctx.shadowColor = 'rgba(255, 255, 255, 0.8)';
+          ctx.shadowBlur = 4;
           ctx.fillText(ann.content, 0, 0);
           ctx.restore();
         } else if (ann.type === 'doodle') {
-          drawDoodle(ctx, ann.content || '', x, y, img.width * 0.1);
+          drawDoodle(ctx, ann.content || '', x, y, img.width * 0.12);
         }
       });
+      console.log("Canvas drawing complete");
+    };
+
+    img.onerror = (e) => {
+      console.error("Failed to load image for canvas drawing:", e);
     };
   };
 
