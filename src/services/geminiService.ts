@@ -61,93 +61,40 @@ async function resizeImage(base64Str: string, maxDim: number = 1024): Promise<st
   });
 }
 
-export async function analyzeLinkedInProfile(base64Image: string): Promise<Annotation[]> {
-  // Use the API key automatically provided by the AI Studio environment
+export async function trollWithNanobanana1(base64Image: string): Promise<string> {
+  // Use the platform-provided key
   const apiKey = process.env.GEMINI_API_KEY || "";
-  
   const ai = new GoogleGenAI({ apiKey });
-  // Using gemini-2.5-flash for speed and reliability in vision tasks
-  const model = "gemini-2.5-flash";
+  const model = "gemini-2.5-flash-image";
   
-  console.log("Resizing image...");
-  let resizedImage;
-  try {
-    resizedImage = await resizeImage(base64Image);
-  } catch (e: any) {
-    console.error("Resize failed:", e);
-    throw new Error(`Failed to process image: ${e.message}`);
-  }
-  
+  console.log("Resizing image for Nanobanana 1...");
+  const resizedImage = await resizeImage(base64Image, 1024);
   const base64Data = resizedImage.split(',')[1];
-  console.log("Image resized, calling Gemini with model:", model);
+  
+  const prompt = "You are a professional LinkedIn troller. Edit this LinkedIn profile screenshot by adding snarky, funny, 'red ink' style annotations, circles, and doodles (like clown noses or poop emojis) over the most cringe or braggy parts. Make it look like a teacher graded a bad essay with a red pen. The annotations should be funny and mocking.";
 
-  const prompt = `
-    You are a professional LinkedIn troller. Your job is to find the most cringe, braggy, or "thought leader" parts of a LinkedIn profile and mock them with red ink annotations.
-    
-    Analyze the provided image and return a list of annotations. 
-    Be creative, snarky, and funny. Use "red ink" style comments.
-    
-    Types of annotations:
-    - 'text': A snarky comment.
-    - 'arrow': Points from (x, y) to (targetX, targetY).
-    - 'circle': Circles an area at (x, y).
-    - 'doodle': A funny drawing (e.g., 'devil horns' on the profile pic, 'clown nose', 'poop emoji').
-    
-    Coordinates (x, y, targetX, targetY) must be normalized from 0 to 100 relative to the image size.
-    
-    Return ONLY a JSON array of Annotation objects.
-  `;
-
+  console.log("Calling Nanobanana 1 for image editing...");
   try {
     const response = await ai.models.generateContent({
       model,
-      contents: [
-        {
-          parts: [
-            { text: prompt },
-            {
-              inlineData: {
-                mimeType: "image/jpeg",
-                data: base64Data
-              }
-            }
-          ]
-        }
-      ],
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.ARRAY,
-          items: {
-            type: Type.OBJECT,
-            properties: {
-              type: { type: Type.STRING, enum: ['text', 'arrow', 'circle', 'doodle'] },
-              x: { type: Type.NUMBER },
-              y: { type: Type.NUMBER },
-              content: { type: Type.STRING },
-              rotation: { type: Type.NUMBER },
-              targetX: { type: Type.NUMBER },
-              targetY: { type: Type.NUMBER }
-            },
-            required: ['type', 'x', 'y']
-          }
-        }
+      contents: {
+        parts: [
+          { inlineData: { mimeType: "image/jpeg", data: base64Data } },
+          { text: prompt }
+        ]
       }
     });
 
-    if (!response.text) {
-      console.warn("Gemini returned an empty response text.");
-      return [];
+    // Find the image part in the response
+    for (const part of response.candidates?.[0]?.content?.parts || []) {
+      if (part.inlineData) {
+        return `data:image/png;base64,${part.inlineData.data}`;
+      }
     }
-
-    console.log("Gemini raw response:", response.text);
-    const parsed = JSON.parse(response.text);
-    return Array.isArray(parsed) ? parsed : [];
+    
+    throw new Error("Gemini did not return an edited image.");
   } catch (e: any) {
-    console.error("Error in analyzeLinkedInProfile:", e);
-    if (e.message?.includes("API key")) {
-      throw new Error("Invalid API key. Please check your Gemini API key configuration.");
-    }
-    throw new Error(`Gemini analysis failed: ${e.message || "Unknown error"}`);
+    console.error("Nanobanana 1 failed:", e);
+    throw new Error(`Trolling failed: ${e.message || "Unknown error"}`);
   }
 }
